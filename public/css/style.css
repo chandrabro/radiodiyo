@@ -190,6 +190,14 @@ code { background: var(--panel-2); padding: 1px 6px; border-radius: 6px; font-si
 .notice.ok { background: #0f3322; color: var(--green-2); border-color: #1f6b46; }
 .notice.info { background: #0f2c24; color: #9fe3c6; border-color: #1f5b49; }
 
+/* ---------- install banner ---------- */
+.install-banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 14px; padding: 10px 12px; border-radius: 16px; background: linear-gradient(135deg, #0f4a30, #0a2e1e); border: 1px solid #b95a0e; box-shadow: 0 8px 22px rgba(0, 0, 0, .35); }
+.install-banner img { border-radius: 10px; flex: 0 0 auto; }
+.install-banner .ib-text { flex: 1 1 150px; min-width: 0; line-height: 1.25; }
+.install-banner .ib-text b { display: block; color: var(--orange-2); }
+.install-banner .ib-text span { font-size: .8rem; color: var(--muted); }
+.install-banner .ib-help { flex: 1 1 100%; font-size: .88rem; color: #ffe9c8; background: rgba(0, 0, 0, .28); border-radius: 10px; padding: 8px 10px; }
+
 /* ---------- cards ---------- */
 .card { background: linear-gradient(180deg, var(--panel), #081d13); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-top: 16px; }
 .card h2 { font-size: .85rem; color: var(--orange-2); letter-spacing: .1em; text-transform: uppercase; }

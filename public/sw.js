@@ -1,8 +1,8 @@
 /* Minimal service worker so the radio can be installed as an app and its page opens fast.
  * It only handles the site's own pages/scripts/styles (network first, cache as a fallback).
  * Audio, live streams and /api calls are never touched. */
-const CACHE = 'diyo-shell-v1';
-const SHELL = ['/', '/css/style.css', '/js/schedule.js', '/js/core.js', '/js/voice.js', '/js/listener.js', '/icon.svg'];
+const CACHE = 'diyo-shell-v2';
+const SHELL = ['/', '/css/style.css', '/js/schedule.js', '/js/core.js', '/js/voice.js', '/js/listener.js', '/icon.svg', '/icons/icon-192.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {}));

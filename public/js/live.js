@@ -16,6 +16,8 @@
   var duckTimer = null, clockTimer = null, startedAt = 0;
   var wakeLock = null;
   var buf = null;
+  var beatTimer = null;
+  var beatWarned = false;
 
   function show(el, on) { el.classList.toggle('hidden', !on); }
   function msg(text, kind) {
@@ -38,6 +40,25 @@
       w.textContent = n + ' listeners are connected. Your device uploads a separate audio stream to each one, so above about ' + LISTENER_WARN + ' the audio may stutter or drop. Consider asking some people to listen later.';
       show(w, true);
     } else show(w, false);
+  }
+
+  // Tell the server (and so every listener) that the station is live / not live.
+  // While live this is repeated every 10 s as a heartbeat: if this tab dies, the show ends by itself.
+  function postLive(on) {
+    var A = window.Admin;
+    return fetch('/api/live', {
+      method: 'POST',
+      keepalive: true,
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + Core.getToken() },
+      body: JSON.stringify({ on: on, id: A.getState().settings.liveId }),
+    }).then(function (r) {
+      if (r.status === 401) { A.authFailed(); return false; }
+      if (r.status === 501 && on && !beatWarned) {
+        beatWarned = true;
+        msg('You are LIVE, but the shared live signal needs Supabase. Listeners will find you through the direct connection only, which can be slower and less reliable.', 'info');
+      }
+      return r.ok;
+    }).catch(function () { return false; });
   }
 
   async function goLive() {
@@ -107,6 +128,9 @@
       show($('liveControls'), true);
       msg('You are LIVE. Keep this tab open and the screen awake.', 'ok');
       requestWake();
+      beatWarned = false;
+      postLive(true);
+      beatTimer = setInterval(function () { postLive(true); }, 10000);
       clockTimer = setInterval(function () {
         var s = Math.floor((Date.now() - startedAt) / 1000);
         $('liveTime').textContent = 'On air ' + Core.fmtDuration(s);
@@ -160,8 +184,10 @@
   document.addEventListener('visibilitychange', function () { if (live && document.visibilityState === 'visible') requestWake(); });
 
   function cleanup() {
+    var wasLive = live;
     live = false;
-    clearInterval(duckTimer); clearInterval(clockTimer);
+    clearInterval(duckTimer); clearInterval(clockTimer); clearInterval(beatTimer);
+    if (wasLive) postLive(false); // listeners go back to the schedule right away
     Object.keys(calls).forEach(function (k) { try { calls[k].close(); } catch (e) { /* ignore */ } });
     calls = {};
     try { if (peer) peer.destroy(); } catch (e) { /* ignore */ }

@@ -22,6 +22,7 @@ ai-radio-station/
 │  ├─ state.js               load/save library, playlists, schedule, settings
 │  ├─ host.js                AI host line (Gemini / Mistral) + optional weather
 │  ├─ messages.js            listener requests / dedications (admin reads them)
+│  ├─ live.js                shared "are we live?" signal (admin heartbeat, listeners poll)
 │  ├─ health.js              setup checker: open /api/health to see which keys the server can see
 │  ├─ jamendo.js             Jamendo music search proxy
 │  ├─ archive.js             Internet Archive metadata fallback proxy
@@ -30,7 +31,7 @@ ai-radio-station/
 │  ├─ index.html             listener page
 │  ├─ admin.html             admin page
 │  ├─ css/style.css          green & orange theme + vintage radio
-│  ├─ manifest.webmanifest, sw.js, icon.svg   install-as-app support
+│  ├─ manifest.webmanifest, sw.js, icon.svg, icons/*.png   install-as-app support
 │  ├─ data/state.json        station data file (used when Supabase is not set up)
 │  └─ js/  schedule.js  core.js  voice.js  listener.js  admin.js  live.js
 ├─ tests/schedule.test.js    unit tests for the schedule engine
@@ -116,7 +117,12 @@ With Supabase set up, the radio page shows a request form (name, type, 200-chara
 
 ## Install as an app
 
-On Android Chrome the radio page shows an **Install** button; on iPhone use Safari → Share → *Add to Home Screen*. The app only caches the page itself; audio always streams live.
+When someone opens the radio on an **Android phone**, a green banner appears at the top: **"दियो radio एप इन्स्टल गर्नुहोस्"** with an **Install** button. Tapping it shows Android's own install box; after they accept, the radio is on their home screen with the diya icon and opens full screen like a normal app. Updates arrive automatically, because the app is just your website.
+
+- If the browser does not offer the install box by itself (for example Samsung Internet or Firefox), the banner shows a **How?** button with the manual steps: browser menu (three dots), then **Install app** or **Add to Home screen**.
+- On iPhone the banner explains: Safari, Share button, **Add to Home Screen**.
+- Closing the banner hides it for a week. It never shows inside the installed app or on computers.
+- Requirements already handled: HTTPS (Vercel), a web app manifest with 192 and 512 pixel icons (`public/icons`), and a service worker (`public/sw.js`). The app only caches the page itself; audio always streams live.
 
 ## Adding your own recordings
 
@@ -135,8 +141,10 @@ The player never keeps a private playlist position. Every second it asks: *given
 ## Going live
 
 1. Admin → **Go live** → press the button and allow the microphone.
-2. Listeners' pages connect automatically, show a red **LIVE** badge and pause the schedule. When you stop, they return to the schedule.
-3. Use *Mute mic*, play a library track into the broadcast, and let the music duck while you talk.
+2. **The scheduled programme stops for everyone within about 5 seconds.** Listeners see a red **LIVE** badge and hear you. The page checks a shared live signal (`/api/live`, stored in your Supabase table, no new setup needed) and then connects to your microphone.
+3. **When you press Stop broadcast, the schedule continues** at the position it should be at that moment (the same song everyone would be hearing). If your tab closes or loses internet, the signal expires after 30 seconds and listeners return to the schedule by themselves.
+4. If a listener's network cannot connect to you (strict firewalls), after 20 seconds their page plays the schedule again and keeps retrying, instead of leaving them in silence.
+5. Use *Mute mic*, play a library track into the broadcast, and let the music duck while you talk.
 
 Honest limits:
 - Audio goes **directly from your device to each listener**. Keep it to about **20 listeners** (the page warns you).

@@ -7,6 +7,11 @@
   <meta name="description" content="दियो online radio: संगीत, AI होस्ट र लाइभ कार्यक्रम।">
   <title>दियो online radio</title>
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="दियो radio">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -32,6 +37,18 @@
       </div>
       <span class="badge" id="liveBadge"><span class="dot"></span><span id="liveText">OFF AIR</span></span>
     </header>
+
+    <!-- install-as-app banner (shown on phones that can install the app) -->
+    <div class="install-banner hidden" id="installBanner" role="region" aria-label="Install app">
+      <img src="/icons/icon-192.png" alt="" width="44" height="44">
+      <div class="ib-text">
+        <b>दियो radio एप इन्स्टल गर्नुहोस्</b>
+        <span id="installSub">Install the app on your phone: opens instantly, no browser bar.</span>
+      </div>
+      <button class="primary sm" id="installBannerBtn">Install</button>
+      <button class="ghost sm" id="installClose" aria-label="Close">✕</button>
+      <div class="ib-help hidden" id="installHelp"></div>
+    </div>
 
     <section class="cabinet" id="cabinet" aria-label="Radio">
       <!-- tuning dial -->

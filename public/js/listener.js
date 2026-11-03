@@ -173,7 +173,7 @@
       var mins = Math.ceil((sleepEnd - Date.now()) / 60000);
       $('sleepText').textContent = mins + 'm';
     }
-    if (liveActive) return;
+    if (liveActive || holdForLive()) { checkLiveFallback(); return; } // schedule is paused during a live show
     ensureGenres();
 
     var np = currentNow();
@@ -249,7 +249,7 @@
     if (pendingMeta) audio.removeEventListener('loadedmetadata', pendingMeta);
     pendingMeta = function () {
       pendingMeta = null;
-      if (currentKey !== key) return;
+      if (currentKey !== key || liveActive || holdForLive()) return;
       if (offset > 1.5 && isFinite(audio.duration) && offset < audio.duration - 1) {
         try { audio.currentTime = offset; } catch (e) { /* ignore */ }
       }
@@ -337,6 +337,7 @@
     setPlayIcon(true);
     show($('tapNotice'), false);
     if (liveActive) { liveAudio.play().catch(function () {}); return; }
+    if (holdForLive()) return; // live show announced: audio starts as soon as we are connected
     currentKey = null;
     hadPlayed = false; // first track after pressing play joins mid-track: no host intro
     tick();
@@ -436,7 +437,7 @@
     var p = prefetch && prefetch.key === np.key ? prefetch.promise : fetchLine(prevTrack, np.track);
     prefetch = null;
     var line = await Promise.race([p, sleep(3500).then(function () { return null; })]);
-    if (!line || currentKey !== np.key || !started || liveActive) return; // skipped: just keep playing
+    if (!line || currentKey !== np.key || !started || liveActive || holdForLive()) return; // skipped: just keep playing
     speakLine(line);
   }
 
@@ -488,75 +489,168 @@
     $('tzNote').textContent = 'समय: ' + tz().replace('_', ' ') + ' (' + tz().split('/').pop().replace('_', ' ') + ')';
   }
 
-  // ---------- live broadcast (PeerJS, listener side) ----------
+  // ---------- live broadcast ----------
+  // Two parts work together:
+  //  1) a shared "live signal" (/api/live, checked every few seconds). While it says LIVE, the
+  //     schedule is paused for everyone and we connect to the broadcaster. When it says the show
+  //     is over, the schedule resumes at the correct position.
+  //  2) PeerJS (WebRTC) carries the voice from the admin's device.
+  var liveSignal = { available: false, on: false, id: '' };
+  var liveHoldSince = 0;   // when we started waiting for the live audio
+  var liveFallback = false; // could not connect for a while: schedule plays again, we keep retrying
+  var liveConnAt = 0;
+  var SIGNAL_POLL_MS = 5000;
+
   function setLiveBadge(on) {
     $('liveBadge').classList.toggle('live', on);
     $('liveText').textContent = on ? 'LIVE' : 'OFF AIR';
     cabinet.classList.toggle('is-live', on);
   }
 
+  function holdForLive() { return liveSignal.available && liveSignal.on && !liveFallback; }
+
+  function liveScreen(connecting) {
+    setLiveBadge(true);
+    $('npLabel').textContent = 'लाइभ प्रसारण · Live';
+    $('npTitle').textContent = connecting ? 'LIVE: जडान हुँदैछ…' : 'LIVE: प्रत्यक्ष प्रसारण';
+    $('npArtist').textContent = stationName();
+    $('npMeta').textContent = connecting ? 'लाइभ प्रसारणसँग जोडिँदैछ…' : 'प्रसारण सकिएपछि तालिका फर्किनेछ।';
+    $('barFill').style.width = '100%';
+    $('needle').style.left = '50%';
+  }
+
+  // Stop the scheduled audio right away (the moment a live show is announced).
+  function pauseSchedule() {
+    if (pendingMeta) { audio.removeEventListener('loadedmetadata', pendingMeta); pendingMeta = null; }
+    try { audio.pause(); } catch (e) { /* ignore */ }
+    HostVoice.cancel();
+    ducking = false;
+    prefetch = null;
+    applyVolume();
+    currentKey = null;
+    earlyPrevKey = null;
+  }
+
   function startLive(stream) {
     if (liveActive) return;
     liveActive = true;
-    setLiveBadge(true);
-    audio.pause();
-    HostVoice.cancel();
-    ducking = false;
-    $('npLabel').textContent = 'लाइभ प्रसारण · Live';
-    $('npTitle').textContent = 'LIVE: प्रत्यक्ष प्रसारण';
-    $('npArtist').textContent = stationName();
-    $('npMeta').textContent = 'प्रसारण सकिएपछि तालिका फर्किनेछ।';
-    $('barFill').style.width = '100%';
-    $('needle').style.left = '50%';
+    liveFallback = false;
+    liveHoldSince = 0;
+    clearStatus('live');
+    pauseSchedule();
+    liveScreen(false);
     liveAudio.srcObject = stream;
     applyVolume();
     liveAudio.onplaying = function () { setPlaying(true); setPlayIcon(true); };
+    try { stream.getTracks().forEach(function (t) { t.addEventListener('ended', function () { stopLive(); }); }); } catch (e) { /* ignore */ }
     if (started) liveAudio.play().catch(function () { show($('tapNotice'), true); });
     else show($('tapNotice'), true);
   }
 
-  function stopLive() {
-    if (!liveActive) return;
+  // Leave live mode. force === true means the live signal says the show is over.
+  function stopLive(force) {
+    if (!liveActive && force !== true) return;
+    var wasActive = liveActive;
     liveActive = false;
-    setLiveBadge(false);
     try { liveAudio.pause(); liveAudio.srcObject = null; } catch (e) { /* ignore */ }
+    liveConn = null;
+    if (liveSignal.available && liveSignal.on && force !== true) {
+      // The connection dropped but the station is still live: wait here and reconnect.
+      liveHoldSince = Date.now();
+      setPlaying(false);
+      liveScreen(true);
+      return;
+    }
+    var schedulePlaying = liveFallback && !wasActive; // schedule was already running: do not restart it
+    liveFallback = false;
+    liveHoldSince = 0;
+    clearStatus('live');
+    setLiveBadge(false);
     $('npLabel').textContent = 'अहिले बज्दैछ · Now playing';
+    if (peer) { try { peer.destroy(); } catch (e) { /* ignore */ } peer = null; }
+    if (schedulePlaying) return;
     setPlaying(false);
     currentKey = null;
-    hadPlayed = false;
+    hadPlayed = false; // rejoin the schedule at the right place, without a host intro
     setTimeout(tick, 200);
+  }
+
+  // If the live audio cannot be reached from this network for 20 s, go back to the schedule
+  // (and keep trying) instead of leaving the listener in silence.
+  function checkLiveFallback() {
+    if (!holdForLive() || liveActive || !liveHoldSince || Date.now() - liveHoldSince < 20000) return;
+    liveFallback = true;
+    setLiveBadge(false);
+    $('npLabel').textContent = 'अहिले बज्दैछ · Now playing';
+    setStatus('लाइभ प्रसारण चलिरहेको छ, तर यो नेटवर्कबाट जोडिन सकेन। तालिकाको कार्यक्रम बज्दैछ, जोड्ने प्रयास जारी छ। (Live is on, but this network could not connect. Playing the schedule and retrying.)', 'info', 'live');
+    currentKey = null;
+  }
+
+  function applyLiveSignal(sig) {
+    var wasOn = liveSignal.available && liveSignal.on;
+    liveSignal = { available: true, on: !!sig.on, id: String(sig.id || '') };
+    if (liveSignal.on) {
+      if (!wasOn) { liveHoldSince = Date.now(); liveFallback = false; }
+      if (!liveActive && !liveFallback) { pauseSchedule(); liveScreen(true); }
+      connectLoop();
+    } else if (wasOn) {
+      stopLive(true); // the show is over: back to the schedule
+    }
+  }
+
+  async function pollLive() {
+    try {
+      var j = await Core.api('/api/live');
+      if (j && j.storage === 'supabase') applyLiveSignal(j);
+      else liveSignal.available = false; // no signal service: rely on the direct connection only
+    } catch (e) { /* offline or server hiccup: keep what we know */ }
   }
 
   function onCall(call) {
     call.answer();
     call.on('stream', function (stream) { startLive(stream); });
-    call.on('close', stopLive);
-    call.on('error', stopLive);
-    if (call.peerConnection) {
-      call.peerConnection.addEventListener('iceconnectionstatechange', function () {
-        var s = call.peerConnection.iceConnectionState;
-        if (s === 'failed' || s === 'closed') stopLive();
+    call.on('close', function () { stopLive(); });
+    call.on('error', function () { stopLive(); });
+    var pc = call.peerConnection;
+    if (pc) {
+      pc.addEventListener('iceconnectionstatechange', function () {
+        if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'closed') stopLive();
+      });
+      pc.addEventListener('connectionstatechange', function () {
+        if (pc.connectionState === 'failed' || pc.connectionState === 'closed') stopLive();
       });
     }
   }
 
+  function liveTargetId() {
+    if (liveSignal.available) return liveSignal.on ? liveSignal.id : '';
+    return state.settings.liveId; // no signal service: always look for the broadcaster
+  }
+
   function connectLoop() {
-    var id = state.settings.liveId;
+    var id = liveTargetId();
     if (!window.Peer || !id || liveActive) return;
     if (!peer || peer.destroyed) {
       peer = new Peer({ config: ICE });
       peer.on('call', onCall);
-      peer.on('error', function () { /* "peer-unavailable" simply means nobody is live right now */ });
+      peer.on('error', function (err) {
+        // "peer-unavailable" just means the broadcaster is not reachable (yet): try again soon.
+        if (err && err.type === 'peer-unavailable') liveConn = null;
+      });
       peer.on('disconnected', function () { try { peer.reconnect(); } catch (e) { /* ignore */ } });
+      peer.on('close', function () { peer = null; liveConn = null; });
       return; // connect once it has opened (next loop)
     }
     if (!peer.open) return;
-    if (liveConn && liveConn.open) return;
+    if (liveConn && liveConn.open && liveConn.peer === id) return;
+    if (liveConn && !liveConn.open && Date.now() - liveConnAt < 9000) return; // still trying
+    if (liveConn) { try { liveConn.close(); } catch (e) { /* ignore */ } }
     var c = peer.connect(id, { reliable: true });
     liveConn = c;
-    var t = setTimeout(function () { if (!c.open) { try { c.close(); } catch (e) { /* ignore */ } } }, 9000);
+    liveConnAt = Date.now();
+    var t = setTimeout(function () { if (!c.open) { try { c.close(); } catch (e) { /* ignore */ } if (liveConn === c) liveConn = null; } }, 9000);
     c.on('open', function () { clearTimeout(t); });
-    c.on('close', function () { clearTimeout(t); stopLive(); });
+    c.on('close', function () { clearTimeout(t); if (liveConn === c) liveConn = null; stopLive(); });
     c.on('error', function () { clearTimeout(t); });
   }
 
@@ -571,20 +665,74 @@
     } catch (e) { /* share cancelled or clipboard blocked */ }
   });
 
+  // ----- install as an app (Android Chrome and other browsers that support it) -----
   var deferredInstall = null;
+  var UA = navigator.userAgent || '';
+  var isAndroid = /Android/i.test(UA);
+  var isIOS = /iPhone|iPad|iPod/i.test(UA);
+  var isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+  var DISMISS_KEY = 'radio_install_dismissed';
+
+  function installDismissed() {
+    var t = parseInt(safeGet(DISMISS_KEY) || '0', 10);
+    return t && Date.now() - t < 7 * 24 * 3600 * 1000; // ask again after a week
+  }
+  function manualSteps() {
+    if (isIOS) return 'iPhone: tap the Share button (square with arrow) in Safari, then "Add to Home Screen".';
+    if (isAndroid) return 'Android: open the browser menu (⋮ three dots), then tap "Install app" or "Add to Home screen".';
+    return 'Use your browser menu and choose "Install app" or "Add to Home screen".';
+  }
+  function showBanner(withManual) {
+    if (isStandalone || installDismissed()) return;
+    show($('installBanner'), true);
+    if (withManual) {
+      $('installSub').textContent = 'Add it to your home screen for one-tap listening.';
+      $('installBannerBtn').textContent = 'How?';
+    }
+  }
+  async function doInstall() {
+    if (deferredInstall) {
+      deferredInstall.prompt();
+      var choice = null;
+      try { choice = await deferredInstall.userChoice; } catch (e) { /* ignore */ }
+      deferredInstall = null;
+      show($('installBtn'), false);
+      if (choice && choice.outcome === 'accepted') show($('installBanner'), false);
+      return;
+    }
+    // Browser did not offer an install prompt: show the manual steps.
+    var help = $('installHelp');
+    help.textContent = manualSteps();
+    show(help, true);
+    show($('installBanner'), true);
+  }
+
   window.addEventListener('beforeinstallprompt', function (e) {
-    e.preventDefault();
+    e.preventDefault();          // keep the prompt for our own Install button
     deferredInstall = e;
+    if (isStandalone) return;
     show($('installBtn'), true);
+    showBanner(false);
   });
-  $('installBtn').addEventListener('click', async function () {
-    if (!deferredInstall) return;
-    deferredInstall.prompt();
-    try { await deferredInstall.userChoice; } catch (e) { /* ignore */ }
+  window.addEventListener('appinstalled', function () {
     deferredInstall = null;
     show($('installBtn'), false);
+    show($('installBanner'), false);
+    setStatus('एप इन्स्टल भयो! होम स्क्रिनबाट खोल्नुहोस्। (App installed. Open it from your home screen.)', 'ok', 'install');
+    setTimeout(function () { clearStatus('install'); }, 6000);
   });
-  window.addEventListener('appinstalled', function () { show($('installBtn'), false); });
+  $('installBtn').addEventListener('click', doInstall);
+  $('installBannerBtn').addEventListener('click', doInstall);
+  $('installClose').addEventListener('click', function () {
+    safeSet(DISMISS_KEY, String(Date.now()));
+    show($('installBanner'), false);
+  });
+  // Phones whose browser never fires the install event (Samsung Internet, Firefox, Safari...): show how to do it by hand.
+  if ((isAndroid || isIOS) && !isStandalone) {
+    setTimeout(function () { if (!deferredInstall) showBanner(true); }, 3500);
+  }
+  if (isStandalone) { show($('installBtn'), false); }
+
   if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () { /* optional */ }); });
 
   // ---------- requests / dedications ----------
@@ -616,6 +764,7 @@
     tune('start');
     await Core.syncClock();
     await refreshState(true);
+    await pollLive();
     renderUpcoming();
     tick();
     setInterval(tick, 500);
@@ -623,7 +772,8 @@
     setInterval(function () { refreshState(false).catch(function () {}); }, 60000);
     setInterval(function () { bad.clear(); }, 10 * 60000);
     setInterval(function () { Core.syncClock(); }, 10 * 60000);
-    setInterval(connectLoop, 8000);
+    setInterval(pollLive, SIGNAL_POLL_MS);
+    setInterval(connectLoop, 4000);
     setTimeout(connectLoop, 1500);
     pickVoice();
   }

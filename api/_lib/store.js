@@ -25,20 +25,29 @@ async function fail(r, what) {
   throw new Error('Supabase ' + what + ' failed (' + r.status + '): ' + t);
 }
 
-async function loadState() {
-  const r = await fetch(url('radio_state') + '?id=eq.main&select=data', { headers: headers() });
+async function loadRow(id) {
+  const r = await fetch(url('radio_state') + '?id=eq.' + encodeURIComponent(id) + '&select=data,updated_at', { headers: headers() });
   if (!r.ok) await fail(r, 'read');
   const rows = await r.json();
-  return rows.length ? rows[0].data : null;
+  return rows.length ? rows[0] : null;
 }
 
-async function saveState(data) {
+async function saveRow(id, data) {
   const r = await fetch(url('radio_state') + '?on_conflict=id', {
     method: 'POST',
     headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
-    body: JSON.stringify({ id: 'main', data, updated_at: new Date().toISOString() }),
+    body: JSON.stringify({ id, data, updated_at: new Date().toISOString() }),
   });
   if (!r.ok) await fail(r, 'write');
+}
+
+async function loadState() {
+  const row = await loadRow('main');
+  return row ? row.data : null;
+}
+
+function saveState(data) {
+  return saveRow('main', data);
 }
 
 async function addMessage(row) {
@@ -61,4 +70,4 @@ async function deleteMessage(id) {
   if (!r.ok) await fail(r, 'message delete');
 }
 
-module.exports = { hasDb, loadState, saveState, addMessage, listMessages, deleteMessage };
+module.exports = { hasDb, loadRow, saveRow, loadState, saveState, addMessage, listMessages, deleteMessage };
