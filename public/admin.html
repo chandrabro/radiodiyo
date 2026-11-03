@@ -121,19 +121,19 @@
     <!-- SCHEDULE -->
     <section id="tab-schedule" class="hidden">
       <div class="card">
-        <h2>Add a time slot</h2>
+        <h2 id="scFormTitle">Add a time slot</h2>
         <div class="infobox">Everyone hears the same programme: the player works out what should be on from the clock and joins mid-track. Times use the timezone in "Station &amp; data".</div>
         <label>Days</label>
         <div id="scDays"></div>
         <div class="grid2">
-          <div><label for="scStart">Start</label><input type="time" id="scStart" value="08:00"></div>
-          <div><label for="scEnd">End (earlier than start = past midnight)</label><input type="time" id="scEnd" value="10:00"></div>
+          <div><label id="scStartLbl">Start</label><div class="timepick" role="group" aria-labelledby="scStartLbl"><select id="scStartH" aria-label="Start hour"></select><span>:</span><select id="scStartM" aria-label="Start minute"></select><select id="scStartP" aria-label="Start AM or PM"><option>AM</option><option>PM</option></select></div></div>
+          <div><label id="scEndLbl">End (earlier than start = past midnight)</label><div class="timepick" role="group" aria-labelledby="scEndLbl"><select id="scEndH" aria-label="End (earlier than start = past midnight) hour"></select><span>:</span><select id="scEndM" aria-label="End (earlier than start = past midnight) minute"></select><select id="scEndP" aria-label="End (earlier than start = past midnight) AM or PM"><option>AM</option><option>PM</option></select></div></div>
           <div><label for="scType">Plays</label>
             <select id="scType"><option value="playlist">A playlist</option><option value="track">A single recording (loops)</option><option value="genre">Auto music by genre (Jamendo)</option></select></div>
           <div id="scWhatWrap"><label for="scWhat" id="scWhatLabel">Playlist</label><select id="scWhat"></select><input type="text" id="scGenre" class="hidden" placeholder="e.g. lofi" list="jmTags"></div>
           <div><label for="scLabel">Programme name (optional)</label><input type="text" id="scLabel" placeholder="Morning Show"></div>
         </div>
-        <p><button id="scAdd" class="primary">Add to timetable</button></p>
+        <p style="display:flex;gap:8px;flex-wrap:wrap"><button id="scAdd" class="primary">Add to timetable</button><button id="scCancel" class="hidden">Cancel editing</button></p>
       </div>
       <div class="card">
         <h2>Weekly timetable</h2>

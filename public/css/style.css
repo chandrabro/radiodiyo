@@ -228,6 +228,12 @@ label.inline input { width: auto; min-height: 0; accent-color: var(--orange); }
 .hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
 
 /* ---------- admin ---------- */
+.timepick { display: flex; align-items: center; gap: 6px; }
+.timepick select { flex: 1 1 0; min-width: 0; padding-left: 8px; padding-right: 4px; }
+.timepick span { color: var(--muted); font-weight: 800; }
+button.iconbtn { min-width: 38px; }
+button.iconbtn svg { display: block; }
+button.sm.active { background: var(--orange); color: #2a1200; border-color: transparent; }
 .login { max-width: 380px; margin: 14vh auto 0; }
 .tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin: 8px 0 12px; position: sticky; top: 0; background: var(--bg); z-index: 5; }
 .tabs button { white-space: nowrap; }

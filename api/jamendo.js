@@ -5,7 +5,7 @@
 // It tries several simple searches until one returns tracks:
 //   1) exact tag   2) fuzzy tag   3) free-text search   4) exact tag without sorting
 
-function mapTracks(j, tag) {
+function mapTracks(j, tag, clientId) {
   return (j.results || [])
     .filter((t) => t.audio && Number(t.duration) > 0)
     .map((t) => ({
@@ -13,6 +13,11 @@ function mapTracks(j, tag) {
       title: t.name,
       artist: t.artist_name,
       url: t.audio,
+      // Backup sources the player tries if the first one fails on a device.
+      alts: [
+        t.audiodownload_allowed && t.audiodownload ? t.audiodownload : '',
+        'https://api.jamendo.com/v3.0/tracks/file/?client_id=' + encodeURIComponent(clientId) + '&id=' + encodeURIComponent(t.id) + '&action=stream&audioformat=mp32',
+      ].filter(Boolean),
       duration: Number(t.duration),
       license: t.license_ccurl || '',
       source: 'jamendo',
@@ -53,7 +58,7 @@ module.exports = async function handler(req, res) {
     let last = null;
     for (let i = 0; i < attempts.length; i++) {
       last = await ask(clientId, attempts[i], limit);
-      const tracks = mapTracks(last, raw);
+      const tracks = mapTracks(last, raw, clientId);
       if (tracks.length) {
         res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
         return res.status(200).json({ tracks });

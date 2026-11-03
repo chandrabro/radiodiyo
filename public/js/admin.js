@@ -116,6 +116,34 @@
   });
 
   // ---------- library ----------
+  // ---------- preview player (play / pause icons) ----------
+  var ICON_PLAY = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>';
+  var ICON_PAUSE = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
+  var preview = new Audio();
+  var previewUrl = '';
+
+  // Make every preview button show pause for the track that is playing and play for all others.
+  function syncPreviewIcons() {
+    var playing = !preview.paused && !preview.ended && !!previewUrl;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-play],[data-jprev]'), function (b) {
+      var on = playing && b.getAttribute('data-url') === previewUrl;
+      b.innerHTML = on ? ICON_PAUSE : ICON_PLAY;
+      b.setAttribute('aria-label', on ? 'Pause preview' : 'Play preview');
+      b.setAttribute('title', on ? 'Pause' : 'Play preview');
+      b.classList.toggle('active', on);
+    });
+  }
+  function togglePreview(url, title) {
+    if (previewUrl === url && !preview.paused && !preview.ended) { preview.pause(); return; }
+    if (previewUrl !== url || preview.ended) { previewUrl = url; preview.src = url; }
+    preview.play().catch(function () {
+      toast('Could not play "' + title + '". The link may be dead or blocked.', 'err');
+      previewUrl = '';
+      syncPreviewIcons();
+    });
+  }
+  ['play', 'playing', 'pause', 'ended', 'error', 'emptied'].forEach(function (ev) { preview.addEventListener(ev, syncPreviewIcons); });
+
   function addTracks(list) {
     var have = {};
     state.library.forEach(function (t) { have[t.url] = true; });
@@ -139,14 +167,14 @@
         '<td><span class="pill ' + esc(t.source) + '">' + esc(t.source) + '</span></td>' +
         '<td>' + Core.fmtDuration(t.duration) + '</td>' +
         '<td><input type="text" data-edit="tags" data-i="' + i + '" value="' + esc((t.tags || []).join(', ')) + '" aria-label="Tags" placeholder="tag, tag"></td>' +
-        '<td><button class="sm" data-play="' + i + '" aria-label="Preview">▶</button> <button class="sm danger" data-del="' + i + '" aria-label="Delete">Delete</button></td>' +
+        '<td><button class="sm iconbtn" data-play="' + i + '" data-url="' + esc(t.url) + '" aria-label="Play preview">' + ICON_PLAY + '</button> <button class="sm danger" data-del="' + i + '" aria-label="Delete">Delete</button></td>' +
         '</tr>';
     }).join('');
     renderPlaylists();
     renderSchedule();
+    syncPreviewIcons();
   }
 
-  var preview = new Audio();
   $('libBody').addEventListener('click', function (e) {
     var d = e.target.closest('[data-del]');
     var p = e.target.closest('[data-play]');
@@ -154,15 +182,14 @@
       var i = +d.getAttribute('data-del');
       var t = state.library[i];
       if (!confirm('Delete "' + t.title + '" from the library? It will also be removed from playlists and schedule slots.')) return;
+      if (previewUrl === t.url) { preview.pause(); previewUrl = ''; }
       state.library.splice(i, 1);
       state.playlists.forEach(function (pl) { pl.trackIds = pl.trackIds.filter(function (id) { return id !== t.id; }); });
       state.schedule = state.schedule.filter(function (s) { return !(s.type === 'track' && s.trackId === t.id); });
       markDirty(); renderLibrary();
     } else if (p) {
       var tr = state.library[+p.getAttribute('data-play')];
-      if (!preview.paused && preview.getAttribute('src') === tr.url) { preview.pause(); return; }
-      preview.src = tr.url;
-      preview.play().catch(function () { toast('Could not play "' + tr.title + '". The link may be dead or blocked.', 'err'); });
+      togglePreview(tr.url, tr.title);
     }
   });
   $('libBody').addEventListener('change', function (e) {
@@ -187,9 +214,10 @@
       if (!tracks.length) { out.innerHTML = '<p class="muted">No tracks found. Try another tag.</p>'; return; }
       out.innerHTML = '<p><button id="jmAddAll" class="sm">Add all ' + tracks.length + '</button></p>' + tracks.map(function (t, i) {
         return '<div class="pickrow"><div class="t"><b>' + esc(t.title) + '</b> <span class="muted">· ' + esc(t.artist) + ' · ' + Core.fmtDuration(t.duration) + '</span></div>' +
-          '<button class="sm" data-jprev="' + i + '">▶</button><button class="sm primary" data-jadd="' + i + '">Add</button></div>';
+          '<button class="sm iconbtn" data-jprev="' + i + '" data-url="' + esc(t.url) + '" aria-label="Play preview">' + ICON_PLAY + '</button><button class="sm primary" data-jadd="' + i + '">Add</button></div>';
       }).join('');
       out._tracks = tracks;
+      syncPreviewIcons();
     } catch (e) {
       out.innerHTML = '<div class="notice err">' + esc(e.message) + '</div>';
     }
@@ -202,7 +230,7 @@
     var pv = e.target.closest('[data-jprev]');
     if (e.target.id === 'jmAddAll') { toast('Added ' + addTracks(out._tracks) + ' tracks.'); }
     else if (a) { toast(addTracks([out._tracks[+a.getAttribute('data-jadd')]]) ? 'Added.' : 'Already in the library.', 'ok'); }
-    else if (pv) { preview.src = out._tracks[+pv.getAttribute('data-jprev')].url; preview.play().catch(function () { toast('Preview failed.', 'err'); }); }
+    else if (pv) { var jt = out._tracks[+pv.getAttribute('data-jprev')]; togglePreview(jt.url, jt.title); }
   });
 
   // Internet Archive
@@ -370,7 +398,7 @@
     show($('scEmpty'), !sorted.length);
     $('scBody').innerHTML = sorted.map(function (s) {
       var days = (s.days || []).slice().sort().map(function (d) { return RadioSchedule.DAY_NAMES[d].slice(0, 3); }).join(' ');
-      return '<tr><td>' + days + '</td><td>' + esc(s.start) + '–' + esc(s.end) + (RadioSchedule.toSec(s.end) <= RadioSchedule.toSec(s.start) ? ' <span class="pill">+1 day</span>' : '') + '</td><td>' + esc(RadioSchedule.describeSlot(state, s)) + '</td><td><button class="sm danger" data-scdel="' + esc(s.id) + '">Remove</button></td></tr>';
+      return '<tr><td>' + days + '</td><td>' + esc(fmt12(s.start)) + ' – ' + esc(fmt12(s.end)) + (RadioSchedule.toSec(s.end) <= RadioSchedule.toSec(s.start) ? ' <span class="pill">+1 day</span>' : '') + '</td><td>' + esc(RadioSchedule.describeSlot(state, s)) + '</td><td style="white-space:nowrap"><button class="sm" data-scedit="' + esc(s.id) + '">Edit</button> <button class="sm danger" data-scdel="' + esc(s.id) + '">Remove</button></td></tr>';
     }).join('');
 
     var st = state.settings;
@@ -394,27 +422,95 @@
     state.settings.defaultGenre = $('defGenre').value.trim().toLowerCase() || 'relaxing';
     markDirty(); renderSchedule();
   });
+  // ----- time pickers: hour / minute / AM-PM dropdowns (editable on every device) -----
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function fmt12(hhmm) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || ''));
+    if (!m) return String(hhmm || '');
+    var h = parseInt(m[1], 10);
+    return (h % 12 || 12) + ':' + m[2] + ' ' + (h >= 12 && h < 24 ? 'PM' : 'AM');
+  }
+  function initTimePickers() {
+    ['scStart', 'scEnd'].forEach(function (pref) {
+      var hs = '', ms = '', i;
+      for (i = 1; i <= 12; i++) hs += '<option value="' + i + '">' + i + '</option>';
+      for (i = 0; i < 60; i++) ms += '<option value="' + pad2(i) + '">' + pad2(i) + '</option>';
+      $(pref + 'H').innerHTML = hs;
+      $(pref + 'M').innerHTML = ms;
+    });
+    writeTime('scStart', '08:00');
+    writeTime('scEnd', '10:00');
+  }
+  function readTime(pref) {
+    var h = parseInt($(pref + 'H').value, 10) % 12;
+    if ($(pref + 'P').value === 'PM') h += 12;
+    return pad2(h) + ':' + $(pref + 'M').value;
+  }
+  function writeTime(pref, hhmm) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || '08:00')) || ['', '8', '00'];
+    var h = parseInt(m[1], 10) % 24;
+    $(pref + 'P').value = h >= 12 ? 'PM' : 'AM';
+    $(pref + 'H').value = String(h % 12 || 12);
+    $(pref + 'M').value = m[2];
+  }
+  initTimePickers();
+
+  // ----- add / edit / remove slots -----
+  var editingId = '';
+  function resetSlotForm() {
+    editingId = '';
+    $('scAdd').textContent = 'Add to timetable';
+    $('scFormTitle').textContent = 'Add a time slot';
+    show($('scCancel'), false);
+  }
+  $('scCancel').addEventListener('click', resetSlotForm);
+
   $('scAdd').addEventListener('click', function () {
     var type = $('scType').value;
-    var slot = { id: Core.uid('slot'), days: selectedDays.slice().sort(), start: $('scStart').value, end: $('scEnd').value, type: type, label: $('scLabel').value.trim() };
+    var slot = { id: editingId || Core.uid('slot'), days: selectedDays.slice().sort(), start: readTime('scStart'), end: readTime('scEnd'), type: type, label: $('scLabel').value.trim() };
     if (!slot.days.length) return toast('Pick at least one day.', 'err');
-    if (!slot.start || !slot.end) return toast('Set a start and end time.', 'err');
-    if (slot.start === slot.end) return toast('Start and end must be different (use e.g. 00:00 to 23:59 for all day).', 'err');
+    if (slot.start === slot.end) return toast('Start and end must be different (for all day use 12:00 AM to 11:59 PM).', 'err');
     if (type === 'playlist') { slot.playlistId = $('scWhat').value; if (!slot.playlistId) return toast('Create a playlist first.', 'err'); }
     else if (type === 'track') { slot.trackId = $('scWhat').value; if (!slot.trackId) return toast('Add a recording to the library first.', 'err'); }
     else { slot.genre = $('scGenre').value.trim(); if (!slot.genre) return toast('Type a genre or mood.', 'err'); }
     var clash = state.schedule.some(function (o) {
-      return o.days.some(function (d) { return slot.days.indexOf(d) >= 0; }) && RadioSchedule.toSec(o.start) < RadioSchedule.toSec(slot.end) && RadioSchedule.toSec(slot.start) < RadioSchedule.toSec(o.end) && RadioSchedule.toSec(o.end) > RadioSchedule.toSec(o.start) && RadioSchedule.toSec(slot.end) > RadioSchedule.toSec(slot.start);
+      return o.id !== slot.id && o.days.some(function (d) { return slot.days.indexOf(d) >= 0; }) && RadioSchedule.toSec(o.start) < RadioSchedule.toSec(slot.end) && RadioSchedule.toSec(slot.start) < RadioSchedule.toSec(o.end) && RadioSchedule.toSec(o.end) > RadioSchedule.toSec(o.start) && RadioSchedule.toSec(slot.end) > RadioSchedule.toSec(slot.start);
     });
-    state.schedule.push(slot);
+    var wasEditing = !!editingId;
+    if (wasEditing) state.schedule = state.schedule.map(function (o) { return o.id === slot.id ? slot : o; });
+    else state.schedule.push(slot);
+    resetSlotForm();
     markDirty(); renderSchedule();
-    toast(clash ? 'Added, but it overlaps another slot. The slot that started most recently wins.' : 'Slot added.', clash ? 'info' : 'ok');
+    var base = wasEditing ? 'Slot updated.' : 'Slot added.';
+    toast(clash ? base + ' It overlaps another slot: the slot that started most recently wins.' : base, clash ? 'info' : 'ok');
   });
+
   $('scBody').addEventListener('click', function (e) {
-    var b = e.target.closest('[data-scdel]');
-    if (!b) return;
-    state.schedule = state.schedule.filter(function (s) { return s.id !== b.getAttribute('data-scdel'); });
-    markDirty(); renderSchedule();
+    var del = e.target.closest('[data-scdel]');
+    var ed = e.target.closest('[data-scedit]');
+    if (del) {
+      var id = del.getAttribute('data-scdel');
+      if (editingId === id) resetSlotForm();
+      state.schedule = state.schedule.filter(function (s) { return s.id !== id; });
+      markDirty(); renderSchedule();
+    } else if (ed) {
+      var slot = state.schedule.filter(function (s) { return s.id === ed.getAttribute('data-scedit'); })[0];
+      if (!slot) return;
+      editingId = slot.id;
+      selectedDays = (slot.days || []).slice();
+      renderDays();
+      writeTime('scStart', slot.start);
+      writeTime('scEnd', slot.end);
+      $('scType').value = slot.type;
+      renderSchedule();
+      if (slot.type === 'genre') $('scGenre').value = slot.genre || '';
+      else $('scWhat').value = slot.type === 'playlist' ? slot.playlistId : slot.trackId;
+      $('scLabel').value = slot.label || '';
+      $('scAdd').textContent = 'Save changes to this slot';
+      $('scFormTitle').textContent = 'Edit time slot';
+      show($('scCancel'), true);
+      $('scFormTitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   });
 
   // ---------- host ----------

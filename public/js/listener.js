@@ -37,6 +37,8 @@
   var sleepIdx = 0;
   var sleepEnd = 0;
   var statusTag = '';
+  var attempt = 0;               // which audio source of the current track we are trying
+  var lastBadAt = 0;
   var userVol = parseFloat(safeGet('radio_vol'));
   if (!isFinite(userVol)) userVol = 0.8;
 
@@ -176,6 +178,7 @@
 
     var np = currentNow();
     if (!np) {
+      if (bad.size && Date.now() - lastBadAt > 20000) bad.clear(); // give failed tracks another chance
       $('npTitle').textContent = started ? 'ट्यून हुँदैछ…' : 'सुन्न बटन थिच्नुहोस्';
       $('npArtist').innerHTML = '&nbsp;';
       $('npMeta').innerHTML = '&nbsp;';
@@ -239,6 +242,24 @@
     }).join('');
   }
 
+  function srcList(t) { return [t.url].concat(Array.isArray(t.alts) ? t.alts : []).filter(Boolean); }
+
+  // Load one of the track's audio sources and jump to the right position once it is ready.
+  function loadSrc(track, offset, key) {
+    if (pendingMeta) audio.removeEventListener('loadedmetadata', pendingMeta);
+    pendingMeta = function () {
+      pendingMeta = null;
+      if (currentKey !== key) return;
+      if (offset > 1.5 && isFinite(audio.duration) && offset < audio.duration - 1) {
+        try { audio.currentTime = offset; } catch (e) { /* ignore */ }
+      }
+      audio.play().catch(onPlayBlocked);
+    };
+    audio.addEventListener('loadedmetadata', pendingMeta);
+    audio.src = srcList(track)[attempt] || track.url;
+    audio.load();
+  }
+
   function playNp(np) {
     var track = np.track;
     var prev = currentNp ? currentNp.track : lastTrack;
@@ -251,20 +272,8 @@
     tune(track.id);
     pushHistory(track);
 
-    if (pendingMeta) audio.removeEventListener('loadedmetadata', pendingMeta);
-    var myKey = np.key;
-    var offset = np.offset;
-    pendingMeta = function () {
-      pendingMeta = null;
-      if (currentKey !== myKey) return;
-      if (offset > 1.5 && isFinite(audio.duration) && offset < audio.duration - 1) {
-        try { audio.currentTime = offset; } catch (e) { /* ignore */ }
-      }
-      audio.play().catch(onPlayBlocked);
-    };
-    audio.addEventListener('loadedmetadata', pendingMeta);
-    audio.src = track.url;
-    audio.load();
+    attempt = 0;
+    loadSrc(track, np.offset, np.key);
     applyVolume();
 
     if (!isJoin) maybeHost(np, prev);
@@ -295,13 +304,24 @@
 
   audio.addEventListener('error', function () {
     if (!started || !currentNp || !audio.getAttribute('src')) return;
+    var code = audio.error ? audio.error.code : 0;
+    if (code === 1) return; // aborted on purpose (we switched track): not a failure
     var t = currentNp.track;
     if (!navigator.onLine) {
       setStatus('इन्टरनेट छैन जस्तो छ। जडान आउने प्रतीक्षा गर्दै… (Offline)', 'info', 'net');
       return;
     }
+    // Try the track's backup audio sources before giving up on it.
+    var list = srcList(t);
+    if (attempt + 1 < list.length) {
+      attempt++;
+      var cur = currentNow();
+      loadSrc(t, cur && cur.key === currentKey ? cur.offset : currentNp.offset, currentKey);
+      return;
+    }
     bad.add(t.id);
-    setStatus('"' + (t.title || 'track') + '" लोड हुन सकेन, अर्को गीतमा जाँदै। (Skipping a broken track.)', 'err', 'track');
+    lastBadAt = Date.now();
+    setStatus('"' + (t.title || 'track') + '" लोड हुन सकेन (error ' + code + '), अर्को गीतमा जाँदै। (Skipping a broken track.)', 'err', 'track');
     currentKey = null;
     earlyPrevKey = null;
     setTimeout(tick, 300);

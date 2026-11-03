@@ -22,6 +22,7 @@ ai-radio-station/
 │  ├─ state.js               load/save library, playlists, schedule, settings
 │  ├─ host.js                AI host line (Gemini / Mistral) + optional weather
 │  ├─ messages.js            listener requests / dedications (admin reads them)
+│  ├─ health.js              setup checker: open /api/health to see which keys the server can see
 │  ├─ jamendo.js             Jamendo music search proxy
 │  ├─ archive.js             Internet Archive metadata fallback proxy
 │  └─ time.js                server clock (keeps all listeners in sync)
@@ -100,6 +101,10 @@ Free tiers have rate limits, not "unlimited" use. The app is built for that: it 
 6. Press **Save changes**. Open the main page, press the big play button.
 
 ---
+
+## Schedule times and editing
+
+Times use simple dropdowns (hour, minute, AM/PM) so they can be edited on any phone or computer. Each timetable row has an **Edit** button: it loads the slot into the form, and **Save changes to this slot** updates it. For an all-day slot use 12:00 AM to 11:59 PM; an end time earlier than the start continues past midnight.
 
 ## Free music when nothing is scheduled
 
