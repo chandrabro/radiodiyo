@@ -1,0 +1,15 @@
+{
+  "name": "दियो online radio",
+  "short_name": "दियो radio",
+  "description": "दियो online radio: music, an AI host, live shows and more.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#04140c",
+  "theme_color": "#0b2e1d",
+  "lang": "ne",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "library": [],
+  "playlists": [],
+  "schedule": [],
+  "settings": {
+    "stationName": "दियो online radio",
+    "stationNameEn": "Diyo Online Radio",
+    "timezone": "Asia/Kathmandu",
+    "defaultPlaylistId": "",
+    "defaultGenre": "relaxing",
+    "liveId": "",
+    "host": {
+      "enabled": true,
+      "name": "Maya",
+      "personality": "calm",
+      "language": "en",
+      "every": 1,
+      "custom": "",
+      "voices": { "en": "", "ne": "" },
+      "useWeather": false,
+      "city": "Kathmandu",
+      "lat": 27.7172,
+      "lon": 85.324
+    }
+  }
+}

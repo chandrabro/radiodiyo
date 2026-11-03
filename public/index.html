@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ne">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b2e1d">
+  <meta name="description" content="दियो online radio: संगीत, AI होस्ट र लाइभ कार्यक्रम।">
+  <title>दियो online radio</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;600;800&family=Yatra+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main class="wrap" id="radioRoot">
+    <header class="masthead">
+      <div class="logo">
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <defs>
+            <linearGradient id="lf" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff7a00"/><stop offset=".6" stop-color="#ffb030"/><stop offset="1" stop-color="#fff0b0"/></linearGradient>
+            <linearGradient id="lb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffa63a"/><stop offset="1" stop-color="#c8600a"/></linearGradient>
+          </defs>
+          <g class="flame"><path d="M32 6c5 9 13 14 13 25 0 8-6 14-13 14s-13-6-13-14c0-6 3-9 6-13 1 3 3 5 5 6-1-8 0-12 2-18z" fill="url(#lf)"/><path d="M32 26c2 4 6 7 6 12 0 4-3 6-6 6s-6-2-6-6c0-3 2-5 3-7 1 2 2 3 3 3-1-4 0-6 0-8z" fill="#fff6d6" opacity=".9"/></g>
+          <path d="M10 46h44c0 10-9 16-22 16S10 56 10 46z" fill="url(#lb)"/><rect x="8" y="44" width="48" height="4" rx="2" fill="#ffc15e"/>
+        </svg>
+        <div>
+          <h1 class="brand" id="stationName">दियो online radio</h1>
+          <div class="tag">उज्यालो संगीत, तपाईंको आफ्नै रेडियो</div>
+        </div>
+      </div>
+      <span class="badge" id="liveBadge"><span class="dot"></span><span id="liveText">OFF AIR</span></span>
+    </header>
+
+    <section class="cabinet" id="cabinet" aria-label="Radio">
+      <!-- tuning dial -->
+      <div class="dialwin" aria-hidden="true">
+        <div class="dial-ticks"></div>
+        <div class="dial-nums"><span>88</span><span>92</span><span>96</span><span>100</span><span>104</span><span>108</span></div>
+        <div class="dial-name" id="dialName">दियो</div>
+        <div class="lamp"><i></i>ON AIR</div>
+        <div class="needle" id="needle"></div>
+      </div>
+
+      <div class="radio-body">
+        <div class="grille" aria-hidden="true"></div>
+        <div class="lcd">
+          <div class="np-label" id="npLabel">अहिले बज्दैछ · Now playing</div>
+          <div class="np-title" id="npTitle">सुन्न बटन थिच्नुहोस्</div>
+          <div class="np-artist" id="npArtist">&nbsp;</div>
+          <div class="np-meta" id="npMeta">&nbsp;</div>
+          <div class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="bar" aria-hidden="true"><i id="barFill"></i></div>
+          <div class="times"><span id="timeCur">0:00</span><span id="clock"></span><span id="timeDur">0:00</span></div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="ctl">
+          <div class="knobbox">
+            <span class="knobwrap" aria-hidden="true"></span>
+            <div class="knob" id="volKnob" role="slider" tabindex="0" aria-label="Volume" aria-valuemin="0" aria-valuemax="100" aria-valuenow="80"></div>
+          </div>
+          <div class="knob-val" id="volPct">80%</div>
+          <div class="ctl-label">आवाज<small>Volume</small></div>
+        </div>
+
+        <div class="playwrap">
+          <button class="playbtn" id="playBtn" aria-label="Play">
+            <span class="ridge"></span>
+            <span class="cap"><svg viewBox="0 0 24 24" id="playIcon" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>
+          </button>
+          <div class="ctl-label" id="playLabel">सुन्नुहोस्<small>Listen</small></div>
+        </div>
+
+        <div class="ctl">
+          <button class="pbtn" id="sleepBtn" aria-label="Sleep timer: off" title="Sleep timer">
+            <svg viewBox="0 0 24 24" aria-hidden="true" id="sleepIcon"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg>
+            <span id="sleepText" class="hidden"></span>
+          </button>
+          <div class="ctl-label">सुत्ने टाइमर<small>Sleep timer</small></div>
+        </div>
+      </div>
+
+      <div class="hostline hidden" id="hostLine"></div>
+      <div class="notice hidden" id="status" role="status" aria-live="polite"></div>
+      <div class="notice hidden" id="hostNotice"></div>
+      <div class="notice info hidden" id="tapNotice">सुरु गर्न ठूलो बटन एक पटक थिच्नुहोस्। (Tap the big button to start.)</div>
+    </section>
+
+    <div class="tools">
+      <button id="shareBtn">↗ साझा गर्नुहोस् · Share</button>
+      <button id="installBtn" class="hidden">⬇ एप जस्तै राख्नुहोस् · Install</button>
+    </div>
+
+    <section class="card" aria-label="Schedule">
+      <h2>कार्यक्रम तालिका · On air &amp; coming up</h2>
+      <ul class="upnext" id="upnext"><li class="muted">Loading schedule…</li></ul>
+      <div class="small muted" id="tzNote"></div>
+    </section>
+
+    <section class="card hidden" id="historyCard" aria-label="Recently played">
+      <h2>भर्खरै बजेका · Recently played</h2>
+      <ul class="history" id="history"></ul>
+    </section>
+
+    <section class="card hidden" id="requestCard" aria-label="Requests">
+      <h2>गीत फर्माइस · Request or dedicate</h2>
+      <form id="requestForm" autocomplete="off">
+        <div class="grid2">
+          <div><label for="rqName">तपाईंको नाम · Your name</label><input type="text" id="rqName" maxlength="40" required></div>
+          <div><label for="rqKind">किसिम · Type</label>
+            <select id="rqKind"><option value="request">गीत फर्माइस · Song request</option><option value="dedication">समर्पण · Dedication</option><option value="greeting">शुभकामना · Greeting</option></select></div>
+        </div>
+        <label for="rqText">सन्देश · Message</label>
+        <textarea id="rqText" maxlength="200" rows="3" placeholder="उदाहरण: साथीहरूका लागि एउटा रमाइलो गीत…" required></textarea>
+        <input class="hp" type="text" id="rqWebsite" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <p><button class="primary" type="submit" id="rqSend">पठाउनुहोस् · Send</button></p>
+        <div class="notice hidden" id="rqMsg" role="status"></div>
+      </form>
+    </section>
+
+    <details class="card">
+      <summary>होस्टको आवाज · Host voice (this device)</summary>
+      <label for="voiceSelect">Voice for the AI host</label>
+      <select id="voiceSelect"></select>
+      <div class="small muted">Voices come from your device. Pick one you like.</div>
+    </details>
+
+    <footer>दियो online radio · <a href="/admin">Admin</a></footer>
+  </main>
+
+  <audio id="player" preload="none" playsinline></audio>
+  <audio id="liveAudio" playsinline></audio>
+
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="/js/schedule.js"></script>
+  <script src="/js/core.js"></script>
+  <script src="/js/voice.js"></script>
+  <script src="/js/listener.js"></script>
+</body>
+</html>

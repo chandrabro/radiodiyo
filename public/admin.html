@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#0b0d12">
+  <title>Admin · दियो online radio</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;600;800&family=Yatra+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- LOGIN -->
+  <main class="wrap login hidden" id="loginView">
+    <h1>Admin login</h1>
+    <p class="muted">Enter the admin password you set in the server environment variables.</p>
+    <form id="loginForm">
+      <label for="pw">Password</label>
+      <input type="password" id="pw" autocomplete="current-password" required>
+      <div class="notice err hidden" id="loginErr" role="alert"></div>
+      <p><button class="primary" type="submit" style="width:100%">Log in</button></p>
+    </form>
+    <p class="small"><a href="/">← Back to the radio</a></p>
+  </main>
+
+  <!-- APP -->
+  <main class="wrap wide hidden" id="appView">
+    <div class="topbar">
+      <div class="brand">Admin · <span id="adminStation"></span></div>
+      <div class="row" style="flex:0 0 auto">
+        <span class="badge" id="adminLiveBadge"><span class="dot"></span><span>OFF AIR</span></span>
+        <a class="btn sm" href="/" target="_blank" rel="noopener">Open radio</a>
+        <button class="sm" id="logoutBtn">Log out</button>
+      </div>
+    </div>
+
+    <nav class="tabs" id="tabs" aria-label="Sections">
+      <button data-tab="library" class="active">Library</button>
+      <button data-tab="playlists">Playlists</button>
+      <button data-tab="schedule">Schedule</button>
+      <button data-tab="host">AI host</button>
+      <button data-tab="live">Go live</button>
+      <button data-tab="inbox">Requests <span class="pill" id="inboxCount">0</span></button>
+      <button data-tab="data">Station &amp; data</button>
+    </nav>
+
+    <div class="notice hidden" id="toast" role="status" aria-live="polite"></div>
+
+    <!-- LIBRARY -->
+    <section id="tab-library">
+      <div class="warnbox">Only add audio you own or have permission to play. Jamendo tracks are Creative Commons: check each licence if you plan to use them commercially.</div>
+
+      <details class="card" open>
+        <summary>Add music from Jamendo (free, Creative Commons)</summary>
+        <div class="row">
+          <div><label for="jmTag">Genre or mood</label>
+            <input type="text" id="jmTag" list="jmTags" placeholder="e.g. lofi, rock, chillout, happy">
+            <datalist id="jmTags"><option>pop</option><option>rock</option><option>electronic</option><option>lofi</option><option>jazz</option><option>classical</option><option>hiphop</option><option>chillout</option><option>happy</option><option>relaxing</option><option>energetic</option><option>folk</option></datalist>
+          </div>
+          <button id="jmSearch" class="primary">Search</button>
+        </div>
+        <div id="jmResults"></div>
+      </details>
+
+      <details class="card">
+        <summary>Add my recordings from Internet Archive (recommended)</summary>
+        <div class="infobox">Internet Archive is the most reliable free host for long recordings. Upload your audio at archive.org, then paste the item link or identifier here.</div>
+        <div class="row">
+          <div><label for="iaInput">Item URL or identifier</label>
+            <input type="text" id="iaInput" placeholder="https://archive.org/details/my-recordings"></div>
+          <button id="iaLoad" class="primary">List audio files</button>
+        </div>
+        <div id="iaResults"></div>
+      </details>
+
+      <details class="card">
+        <summary>Add a recording from Google Drive</summary>
+        <div class="warnbox">Drive can fail for large files (it may show a virus-scan page instead of audio) or when many people listen at once. For anything important, use Internet Archive instead. The file must be shared as "Anyone with the link".</div>
+        <div class="grid2">
+          <div><label for="drLink">Share link</label><input type="text" id="drLink" placeholder="https://drive.google.com/file/d/…/view"></div>
+          <div><label for="drTitle">Title</label><input type="text" id="drTitle" placeholder="My recording"></div>
+        </div>
+        <p><button id="drAdd" class="primary">Test &amp; add</button></p>
+      </details>
+
+      <details class="card">
+        <summary>Add a direct MP3 URL</summary>
+        <div class="grid2">
+          <div><label for="dlUrl">Audio URL (https)</label><input type="url" id="dlUrl" placeholder="https://example.com/song.mp3"></div>
+          <div><label for="dlTitle">Title</label><input type="text" id="dlTitle"></div>
+          <div><label for="dlArtist">Artist (optional)</label><input type="text" id="dlArtist"></div>
+        </div>
+        <p><button id="dlAdd" class="primary">Test &amp; add</button></p>
+      </details>
+
+      <div class="card">
+        <h2>Library (<span id="libCount">0</span>)</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Title</th><th>Source</th><th>Length</th><th>Tags</th><th></th></tr></thead>
+          <tbody id="libBody"></tbody>
+        </table></div>
+        <p class="muted small" id="libEmpty">Nothing here yet. Add music above.</p>
+      </div>
+    </section>
+
+    <!-- PLAYLISTS -->
+    <section id="tab-playlists" class="hidden">
+      <div class="card">
+        <h2>Playlists</h2>
+        <div class="row">
+          <div><label for="plName">New playlist name</label><input type="text" id="plName" placeholder="Morning mix"></div>
+          <button id="plAdd" class="primary">Create</button>
+        </div>
+        <div id="plList"></div>
+      </div>
+    </section>
+
+    <!-- SCHEDULE -->
+    <section id="tab-schedule" class="hidden">
+      <div class="card">
+        <h2>Add a time slot</h2>
+        <div class="infobox">Everyone hears the same programme: the player works out what should be on from the clock and joins mid-track. Times use the timezone in "Station &amp; data".</div>
+        <label>Days</label>
+        <div id="scDays"></div>
+        <div class="grid2">
+          <div><label for="scStart">Start</label><input type="time" id="scStart" value="08:00"></div>
+          <div><label for="scEnd">End (earlier than start = past midnight)</label><input type="time" id="scEnd" value="10:00"></div>
+          <div><label for="scType">Plays</label>
+            <select id="scType"><option value="playlist">A playlist</option><option value="track">A single recording (loops)</option><option value="genre">Auto music by genre (Jamendo)</option></select></div>
+          <div id="scWhatWrap"><label for="scWhat" id="scWhatLabel">Playlist</label><select id="scWhat"></select><input type="text" id="scGenre" class="hidden" placeholder="e.g. lofi" list="jmTags"></div>
+          <div><label for="scLabel">Programme name (optional)</label><input type="text" id="scLabel" placeholder="Morning Show"></div>
+        </div>
+        <p><button id="scAdd" class="primary">Add to timetable</button></p>
+      </div>
+      <div class="card">
+        <h2>Weekly timetable</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Days</th><th>Time</th><th>Plays</th><th></th></tr></thead>
+          <tbody id="scBody"></tbody>
+        </table></div>
+        <p class="muted small" id="scEmpty">No slots yet. The default playlist plays all day.</p>
+      </div>
+      <div class="card">
+        <h2>When nothing is scheduled</h2>
+        <p class="muted small">This plays whenever no slot is active. The default is free Creative Commons music from Jamendo, so the station is never silent, even with an empty library.</p>
+        <label for="defPl">Default programme</label>
+        <select id="defPl"></select>
+        <div id="defGenreWrap">
+          <label for="defGenre">Genre or mood for free music</label>
+          <input type="text" id="defGenre" list="jmTags" placeholder="relaxing, pop, folk, lofi…">
+        </div>
+      </div>
+    </section>
+
+    <!-- HOST -->
+    <section id="tab-host" class="hidden">
+      <div class="card">
+        <h2>AI host</h2>
+        <label class="inline"><input type="checkbox" id="hEnabled"> Host speaks between tracks</label>
+        <div class="grid2">
+          <div><label for="hName">Host name</label><input type="text" id="hName"></div>
+          <div><label for="hPers">Personality</label>
+            <select id="hPers"><option value="funny">Funny</option><option value="calm">Calm</option><option value="energetic">Energetic</option><option value="news anchor">News anchor</option></select></div>
+          <div><label for="hLang">Language</label><select id="hLang"><option value="en">English</option><option value="ne">Nepali (नेपाली)</option></select></div>
+          <div><label for="hEvery">Speak every … tracks</label>
+            <select id="hEvery"><option value="1">Every track</option><option value="2">Every 2 tracks</option><option value="3">Every 3 tracks</option><option value="4">Every 4 tracks</option><option value="5">Every 5 tracks</option></select></div>
+        </div>
+        <label for="hCustom">Custom instruction (style only)</label>
+        <textarea id="hCustom" maxlength="300" placeholder="e.g. Mention that the station broadcasts from Kathmandu. Keep it family friendly."></textarea>
+        <label class="inline"><input type="checkbox" id="hWeather"> Mention the weather (free Open-Meteo, no key)</label>
+        <div class="grid2">
+          <div><label for="hLat">Latitude</label><input type="number" id="hLat" step="0.0001"></div>
+          <div><label for="hLon">Longitude</label><input type="number" id="hLon" step="0.0001"></div>
+        </div>
+        <h3 style="margin-top:16px">Test the host on this device</h3>
+        <label for="hVoice">Voice</label><select id="hVoice"></select>
+        <div class="notice hidden" id="hVoiceNotice"></div>
+        <p><button id="hTest" class="primary">Generate &amp; speak a test line</button></p>
+        <div class="hostline hidden" id="hTestOut"></div>
+        <p class="small muted">The voice you pick here is saved as the station default. Each listener can still choose their own on the radio page.</p>
+      </div>
+    </section>
+
+    <!-- LIVE -->
+    <section id="tab-live" class="hidden">
+      <div class="card">
+        <h2>Go live</h2>
+        <div class="warnbox"><b>Be honest with yourself:</b> the broadcast runs from this browser tab. Keep it open, keep the screen awake and stay online. Some networks (strict firewalls, some mobile carriers) block peer-to-peer connections, so a few listeners may not be able to connect. Because your device sends audio to every listener, keep it to about 20 listeners.</div>
+        <div class="row" style="align-items:center">
+          <button id="liveBtn" class="primary" style="flex:0 0 auto;min-width:200px">🎙️ Go live</button>
+          <div style="flex:0 0 auto"><div class="livebig" id="liveCount">0</div><div class="small muted">listeners connected</div></div>
+          <div id="liveTime" class="muted" style="flex:0 0 auto"></div>
+        </div>
+        <div class="notice hidden" id="liveWarn"></div>
+        <div class="notice hidden" id="liveMsg"></div>
+
+        <div id="liveControls" class="hidden">
+          <h3 style="margin-top:16px">Mixer</h3>
+          <div class="row">
+            <button id="muteBtn">🎤 Mute mic</button>
+            <div><label>Mic level</label><div class="meter"><i id="micMeter"></i></div></div>
+          </div>
+          <label class="inline"><input type="checkbox" id="duckOn" checked> Lower the music while I talk</label>
+          <label for="liveTrack">Play a library track into the broadcast</label>
+          <div class="row">
+            <select id="liveTrack"></select>
+            <button id="livePlay">▶ Play</button>
+            <button id="liveStop">■ Stop</button>
+          </div>
+          <label for="liveVol">Music volume</label>
+          <input type="range" id="liveVol" min="0" max="1" step="0.01" value="0.8">
+          <div class="small muted" id="liveNow"></div>
+          <div class="infobox">Tip: a track must come from a host that allows cross-origin audio (Internet Archive does; Google Drive does not) or it will be silent in the broadcast. Wear headphones to avoid echo.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- INBOX -->
+    <section id="tab-inbox" class="hidden">
+      <div class="card">
+        <h2>Song requests &amp; dedications</h2>
+        <div class="infobox">Sent by listeners from the radio page. Only you can read these. Play the song or read the dedication on air when you go live.</div>
+        <p><button id="inboxRefresh" class="sm">Refresh</button></p>
+        <div id="inboxList"><p class="muted">Open this tab to load messages.</p></div>
+      </div>
+    </section>
+
+    <!-- DATA -->
+    <section id="tab-data" class="hidden">
+      <div class="card">
+        <h2>Station</h2>
+        <div class="grid2">
+          <div><label for="stName">Station name</label><input type="text" id="stName"></div>
+          <div><label for="stNameEn">Name for an English-speaking host</label><input type="text" id="stNameEn" placeholder="Diyo Online Radio"></div>
+          <div><label for="stTz">Timezone</label>
+            <input type="text" id="stTz" list="tzList" placeholder="Asia/Kathmandu"><datalist id="tzList"></datalist></div>
+        </div>
+        <div class="small muted" id="stTzNow"></div>
+      </div>
+      <div class="card">
+        <h2>Backup</h2>
+        <p class="muted small" id="storageNote"></p>
+        <div class="row" style="align-items:center">
+          <button id="exportBtn">⬇ Export JSON</button>
+          <button id="importBtn">⬆ Import JSON</button>
+          <input type="file" id="importFile" accept="application/json,.json" class="hidden">
+        </div>
+        <p class="small muted">A copy is also kept in this browser automatically. If you don't use Supabase, export the file, save it as <code>public/data/state.json</code> in your repo and push to GitHub.</p>
+      </div>
+    </section>
+
+    <div class="savebar">
+      <span id="saveState" class="muted small">All changes saved</span>
+      <span style="display:flex;gap:8px">
+        <button id="saveBtn" class="primary">Save changes</button>
+      </span>
+    </div>
+  </main>
+
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="/js/schedule.js"></script>
+  <script src="/js/core.js"></script>
+  <script src="/js/voice.js"></script>
+  <script src="/js/admin.js"></script>
+  <script src="/js/live.js"></script>
+</body>
+</html>
