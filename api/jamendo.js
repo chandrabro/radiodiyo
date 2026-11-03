@@ -4,7 +4,8 @@
 
 module.exports = async function handler(req, res) {
   try {
-    const clientId = process.env.JAMENDO_CLIENT_ID;
+    // Clean up the value: a pasted line break, space or quotes would make Jamendo reject it.
+    const clientId = String(process.env.JAMENDO_CLIENT_ID || '').trim().replace(/^["']+|["']+$/g, '').trim();
     if (!clientId) {
       return res.status(500).json({ error: 'JAMENDO_CLIENT_ID is not set. See the README for how to get a free key.' });
     }
